@@ -75,7 +75,7 @@ variable "high_availability_mode" {
   default     = null
 
   validation {
-    condition     = var.high_availability_mode == null || contains(["SameZone", "ZoneRedundant"], var.high_availability_mode)
+    condition     = var.high_availability_mode == null ? true : contains(["SameZone", "ZoneRedundant"], var.high_availability_mode)
     error_message = "high_availability_mode must be null, 'SameZone', or 'ZoneRedundant'."
   }
 }

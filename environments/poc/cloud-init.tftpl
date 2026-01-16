@@ -1,0 +1,43 @@
+#cloud-config
+# Cloud-init configuration for Drupal PoC VMSS instances
+
+write_files:
+  # Drupal database configuration
+  - path: /etc/drupal/database.conf
+    permissions: '0640'
+    content: |
+      DB_HOST=${db_host}
+      DB_NAME=${db_name}
+      DB_USER=${db_user}
+      DB_PASSWORD=${db_password}
+
+  # Azure Blob Storage configuration for Drupal media
+  - path: /etc/drupal/storage.conf
+    permissions: '0640'
+    content: |
+      AZURE_STORAGE_ACCOUNT=${storage_account}
+      AZURE_STORAGE_CONTAINER=${storage_container}
+      AZURE_BLOB_ENDPOINT=${storage_endpoint}
+
+  # Health check endpoint script
+  - path: /var/www/html/health
+    permissions: '0644'
+    content: |
+      OK
+
+runcmd:
+  # Ensure config directory exists
+  - mkdir -p /etc/drupal
+  - chown root:nginx /etc/drupal
+  - chmod 750 /etc/drupal
+
+  # Set proper permissions on config files
+  - chown root:nginx /etc/drupal/*.conf 2>/dev/null || true
+
+  # Ensure health endpoint is accessible
+  - mkdir -p /var/www/html
+  - chown nginx:nginx /var/www/html/health 2>/dev/null || true
+
+  # Restart services to pick up configuration
+  - systemctl restart php-fpm 2>/dev/null || true
+  - systemctl restart nginx 2>/dev/null || true

@@ -1,0 +1,31 @@
+# Azure Configuration
+subscription_id = "your-subscription-id"
+location        = "eastus"
+
+# Image Gallery (set use_gallery_image = true to use custom image)
+use_gallery_image           = false
+gallery_name                = "drupal_gallery"
+gallery_resource_group_name = "drupal-images-rg"
+image_version               = "1.0.0"
+
+# Load Balancer
+lb_dns_label = "drupal-poc"  # Creates drupal-poc.eastus.cloudapp.azure.com
+
+# VM Configuration
+vm_size              = "Standard_B2s"
+admin_username       = "drupaladmin"
+admin_ssh_public_key = "ssh-ed25519 AAAA... your-key-here"
+
+# PostgreSQL Configuration
+postgresql_sku = "B_Standard_B1ms"
+db_admin_username = "drupaladmin"
+db_admin_password = "CHANGE-THIS-SECURE-PASSWORD"
+db_name           = "drupal"
+
+# Allow your IP to connect to PostgreSQL for management
+db_allowed_ips = ["YOUR.PUBLIC.IP.HERE"]
+
+# Networking (defaults are fine for most cases)
+# vnet_address_space       = ["10.0.0.0/16"]
+# web_subnet_prefix        = "10.0.1.0/24"
+# private_endpoints_prefix = "10.0.2.0/24"
