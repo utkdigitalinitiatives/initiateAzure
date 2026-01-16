@@ -1,0 +1,50 @@
+# Example terraform.tfvars for production environment
+# Copy this file to terraform.tfvars and update with your values
+
+location = "eastus"
+
+# Subnet ID where the VMSS instances will be deployed
+# This should be a subnet in your production VNet
+subnet_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_NETWORK_RG/providers/Microsoft.Network/virtualNetworks/YOUR_VNET/subnets/drupal-subnet"
+
+vm_size = "Standard_D2s_v5"
+
+# Blue (active) VMSS settings
+instance_count = 2
+min_instances  = 2
+max_instances  = 10
+
+# Green (standby) VMSS settings - typically fewer instances
+green_instance_count = 1
+green_min_instances  = 1
+
+admin_username = "drupaladmin"
+
+# Your SSH public key for accessing the VMs
+admin_ssh_public_key = "ssh-rsa AAAAB3... your-key-here"
+
+os_disk_size_gb = 64
+
+# Health probe configuration for Drupal
+health_probe_path = "/health"
+health_probe_port = 80
+
+# Autoscaling settings
+enable_autoscaling      = true
+scale_out_cpu_threshold = 75
+scale_in_cpu_threshold  = 25
+
+# Load balancer backend pool IDs for Front Door integration
+# These should be created as part of your networking/Front Door setup
+# blue_lb_backend_pool_id  = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_RG/providers/Microsoft.Network/loadBalancers/YOUR_LB/backendAddressPools/blue-pool"
+# green_lb_backend_pool_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_RG/providers/Microsoft.Network/loadBalancers/YOUR_LB/backendAddressPools/green-pool"
+
+# Optional: cloud-init script for initial Drupal setup
+# custom_data = <<-EOF
+#   #!/bin/bash
+#   dnf update -y
+#   dnf install -y epel-release
+#   dnf install -y nginx php php-fpm php-pgsql php-gd php-xml php-mbstring php-opcache
+#   systemctl enable nginx php-fpm
+#   systemctl start nginx php-fpm
+# EOF

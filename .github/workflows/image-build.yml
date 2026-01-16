@@ -1,0 +1,71 @@
+name: Build Drupal Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packer/**'
+      - 'ansible/**'
+  workflow_dispatch:
+    inputs:
+      image_version:
+        description: 'Image version (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+jobs:
+  build-image:
+    name: Build Packer Image
+    runs-on: ubuntu-latest
+    outputs:
+      image_version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@main
+        with:
+          version: latest
+
+      - name: Generate version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.image_version }}" ]; then
+            echo "version=${{ github.event.inputs.image_version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$(date +%Y.%m.%d)-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Packer Init
+        working-directory: packer
+        run: packer init .
+
+      - name: Packer Validate
+        working-directory: packer
+        run: packer validate .
+
+      - name: Packer Build
+        working-directory: packer
+        run: |
+          packer build \
+            -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
+            -var "image_version=${{ steps.version.outputs.version }}" \
+            -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
+            -var "gallery_name=${{ vars.GALLERY_NAME }}" \
+            -var "image_name=drupal-rocky-linux-9" \
+            drupal-rocky9.pkr.hcl
+
+      - name: Output image version
+        run: |
+          echo "## Image Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Gallery:** ${{ vars.GALLERY_NAME }}" >> $GITHUB_STEP_SUMMARY

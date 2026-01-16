@@ -1,0 +1,221 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+env:
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  TF_VAR_admin_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+  TF_VAR_db_admin_password: ${{ secrets.DB_ADMIN_PASSWORD }}
+  TF_VAR_gallery_name: ${{ vars.GALLERY_NAME }}
+  TF_VAR_gallery_resource_group_name: ${{ vars.GALLERY_RESOURCE_GROUP }}
+  TF_VAR_subnet_id: ${{ vars.SUBNET_ID }}
+
+jobs:
+  # Stage 1: Build Image (if packer files changed)
+  build-image:
+    name: Build Image
+    runs-on: ubuntu-latest
+    outputs:
+      image_version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for Packer changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            packer:
+              - 'packer/**'
+              - 'ansible/**'
+
+      - name: Generate version
+        id: version
+        run: echo "version=pr-${{ github.event.pull_request.number }}-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      - name: Setup Packer
+        if: steps.changes.outputs.packer == 'true'
+        uses: hashicorp/setup-packer@main
+        with:
+          version: latest
+
+      - name: Build image (if changed)
+        if: steps.changes.outputs.packer == 'true'
+        working-directory: packer
+        run: |
+          packer init .
+          packer build \
+            -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
+            -var "image_version=${{ steps.version.outputs.version }}" \
+            -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
+            -var "gallery_name=${{ vars.GALLERY_NAME }}" \
+            -var "image_name=drupal-rocky-linux-9" \
+            drupal-rocky9.pkr.hcl
+
+  # Stage 2: Deploy Dev Environment
+  deploy-dev:
+    name: Deploy Dev
+    needs: build-image
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      postgresql_fqdn: ${{ steps.outputs.outputs.postgresql_fqdn }}
+      dev_vm_ip: ${{ steps.outputs.outputs.public_ip }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: environments/dev
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: environments/dev
+        run: |
+          terraform apply -auto-approve \
+            -var="pr_number=${{ github.event.pull_request.number }}" \
+            -var="image_version=${{ needs.build-image.outputs.image_version }}"
+
+      - name: Get Outputs
+        id: outputs
+        working-directory: environments/dev
+        run: |
+          echo "postgresql_fqdn=$(terraform output -raw postgresql_fqdn)" >> $GITHUB_OUTPUT
+          echo "public_ip=$(terraform output -raw public_ip_address)" >> $GITHUB_OUTPUT
+
+      - name: Sync Database (pg_dump/pg_restore)
+        env:
+          PROD_DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          PROD_DB_USER: ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          DEV_DB_HOST: ${{ steps.outputs.outputs.postgresql_fqdn }}
+          DEV_DB_USER: drupaladmin
+          DEV_DB_PASSWORD: ${{ secrets.DB_ADMIN_PASSWORD }}
+        run: |
+          # Install PostgreSQL client
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+
+          # Dump production database
+          PGPASSWORD=$PROD_DB_PASSWORD pg_dump \
+            -h $PROD_DB_HOST \
+            -U $PROD_DB_USER \
+            -d drupal \
+            --no-owner --no-acl \
+            > /tmp/drupal_dump.sql
+
+          # Restore to dev/test database
+          PGPASSWORD=$DEV_DB_PASSWORD psql \
+            -h $DEV_DB_HOST \
+            -U $DEV_DB_USER \
+            -d drupal \
+            < /tmp/drupal_dump.sql
+
+      - name: Run Dev Validation Tests
+        run: |
+          DEV_IP="${{ steps.outputs.outputs.public_ip }}"
+          echo "Testing health endpoint on $DEV_IP..."
+
+          # Wait for VM to be ready
+          for i in {1..30}; do
+            if curl -sf http://${DEV_IP}/health; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Waiting for VM... (attempt $i/30)"
+            sleep 10
+          done
+
+          echo "Health check failed after 30 attempts"
+          exit 1
+
+  # Stage 3: Deploy Test Environment
+  deploy-test:
+    name: Deploy Test
+    needs: [build-image, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      # First, destroy Dev VM (sequential: Dev -> Test)
+      - name: Destroy Dev VM
+        working-directory: environments/dev
+        run: |
+          terraform init
+          terraform destroy -auto-approve -target=module.dev_vm \
+            -var="pr_number=${{ github.event.pull_request.number }}" \
+            -var="image_version=${{ needs.build-image.outputs.image_version }}"
+
+      # Deploy Test VM (uses same PostgreSQL)
+      - name: Terraform Init (Test)
+        working-directory: environments/test
+        run: terraform init
+
+      - name: Deploy Test VM
+        working-directory: environments/test
+        run: |
+          terraform apply -auto-approve \
+            -var="pr_number=${{ github.event.pull_request.number }}" \
+            -var="image_version=${{ needs.build-image.outputs.image_version }}"
+
+      - name: Get Test VM IP
+        id: outputs
+        working-directory: environments/test
+        run: |
+          echo "public_ip=$(terraform output -raw public_ip_address)" >> $GITHUB_OUTPUT
+
+      - name: Run Test Validation
+        run: |
+          TEST_IP="${{ steps.outputs.outputs.public_ip }}"
+          echo "Testing health endpoint on $TEST_IP..."
+
+          # Wait for VM to be ready
+          for i in {1..30}; do
+            if curl -sf http://${TEST_IP}/health; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Waiting for VM... (attempt $i/30)"
+            sleep 10
+          done
+
+          echo "Health check failed after 30 attempts"
+          exit 1
+
+  # Stage 4: Ready for Production (requires approval)
+  production-ready:
+    name: Production Ready
+    needs: [build-image, deploy-test]
+    runs-on: ubuntu-latest
+    environment: production-approval
+
+    steps:
+      - name: Production Ready Summary
+        run: |
+          echo "## Production Ready" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Version:** ${{ needs.build-image.outputs.image_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This image has been validated in both dev and test environments." >> $GITHUB_STEP_SUMMARY
+          echo "Ready for production deployment after manual approval." >> $GITHUB_STEP_SUMMARY

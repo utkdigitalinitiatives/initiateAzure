@@ -1,0 +1,280 @@
+---
+- name: Configure Drupal application server
+  hosts: all
+  become: true
+
+  vars:
+    php_version: "{{ php_version | default('8.3') }}"
+    drupal_user: "drupal"
+    drupal_group: "drupal"
+    web_root: "/var/www/drupal"
+    drupal_env: "{{ drupal_env | default('production') }}"
+
+  tasks:
+    # System updates and EPEL repository
+    - name: Update all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    - name: Install EPEL repository
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+
+    # Remi repository for PHP
+    - name: Install Remi repository
+      ansible.builtin.dnf:
+        name: "https://rpms.remirepo.net/enterprise/remi-release-9.rpm"
+        state: present
+        disable_gpg_check: true
+
+    - name: Reset PHP module
+      ansible.builtin.command: dnf module reset php -y
+      changed_when: true
+
+    - name: Enable PHP {{ php_version }} module from Remi
+      ansible.builtin.command: "dnf module enable php:remi-{{ php_version }} -y"
+      changed_when: true
+
+    # Install packages
+    - name: Install required packages
+      ansible.builtin.dnf:
+        name:
+          # Web server
+          - nginx
+          # PHP and extensions
+          - php
+          - php-fpm
+          - php-cli
+          - php-common
+          - php-pdo
+          - php-pgsql
+          - php-mysqlnd
+          - php-gd
+          - php-mbstring
+          - php-xml
+          - php-json
+          - php-opcache
+          - php-curl
+          - php-zip
+          - php-intl
+          - php-bcmath
+          - php-soap
+          # Development tools
+          - git
+          - unzip
+          - patch
+          # Database client
+          - postgresql
+          # Utilities
+          - vim-enhanced
+          - htop
+          - curl
+          - wget
+        state: present
+
+    # Install Composer
+    - name: Download Composer installer
+      ansible.builtin.get_url:
+        url: https://getcomposer.org/installer
+        dest: /tmp/composer-setup.php
+        mode: "0644"
+
+    - name: Install Composer globally
+      ansible.builtin.command: php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+      args:
+        creates: /usr/local/bin/composer
+
+    - name: Remove Composer installer
+      ansible.builtin.file:
+        path: /tmp/composer-setup.php
+        state: absent
+
+    # Create Drupal user and group
+    - name: Create drupal group
+      ansible.builtin.group:
+        name: "{{ drupal_group }}"
+        system: true
+        state: present
+
+    - name: Create drupal user
+      ansible.builtin.user:
+        name: "{{ drupal_user }}"
+        group: "{{ drupal_group }}"
+        groups: nginx
+        create_home: false
+        shell: /sbin/nologin
+        system: true
+        state: present
+
+    - name: Add nginx user to drupal group
+      ansible.builtin.user:
+        name: nginx
+        groups: "{{ drupal_group }}"
+        append: true
+
+    # Create web root directory
+    - name: Create web root directory
+      ansible.builtin.file:
+        path: "{{ web_root }}"
+        state: directory
+        owner: "{{ drupal_user }}"
+        group: "{{ drupal_group }}"
+        mode: "0755"
+
+    - name: Create Drupal files directory
+      ansible.builtin.file:
+        path: "{{ web_root }}/web/sites/default/files"
+        state: directory
+        owner: "{{ drupal_user }}"
+        group: "{{ drupal_group }}"
+        mode: "0775"
+        recurse: true
+
+    # Configure PHP-FPM
+    - name: Configure PHP-FPM pool for Drupal
+      ansible.builtin.template:
+        src: templates/php-fpm-drupal.conf.j2
+        dest: /etc/php-fpm.d/drupal.conf
+        mode: "0644"
+      notify: restart php-fpm
+
+    - name: Remove default PHP-FPM www pool
+      ansible.builtin.file:
+        path: /etc/php-fpm.d/www.conf
+        state: absent
+      notify: restart php-fpm
+
+    # Configure PHP
+    - name: Configure PHP settings
+      ansible.builtin.lineinfile:
+        path: /etc/php.ini
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: "^memory_limit", line: "memory_limit = 256M" }
+        - { regexp: "^upload_max_filesize", line: "upload_max_filesize = 64M" }
+        - { regexp: "^post_max_size", line: "post_max_size = 64M" }
+        - { regexp: "^max_execution_time", line: "max_execution_time = 300" }
+        - { regexp: "^;?date.timezone", line: "date.timezone = UTC" }
+      notify: restart php-fpm
+
+    # Configure Nginx
+    - name: Configure Nginx for Drupal
+      ansible.builtin.template:
+        src: templates/nginx-drupal.conf.j2
+        dest: /etc/nginx/conf.d/drupal.conf
+        mode: "0644"
+      notify: restart nginx
+
+    - name: Remove default Nginx server block
+      ansible.builtin.file:
+        path: /etc/nginx/conf.d/default.conf
+        state: absent
+      notify: restart nginx
+
+    # Create health check endpoint
+    - name: Create health check directory
+      ansible.builtin.file:
+        path: "{{ web_root }}/web"
+        state: directory
+        owner: "{{ drupal_user }}"
+        group: "{{ drupal_group }}"
+        mode: "0755"
+
+    - name: Create health check endpoint
+      ansible.builtin.copy:
+        content: "OK"
+        dest: "{{ web_root }}/web/health"
+        owner: "{{ drupal_user }}"
+        group: "{{ drupal_group }}"
+        mode: "0644"
+
+    # Create environment config directory
+    - name: Create Drupal config directory
+      ansible.builtin.file:
+        path: /etc/drupal
+        state: directory
+        owner: root
+        group: "{{ drupal_group }}"
+        mode: "0750"
+
+    # Enable and start services
+    - name: Enable nginx service
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+
+    - name: Enable php-fpm service
+      ansible.builtin.systemd:
+        name: php-fpm
+        enabled: true
+
+    # Firewall configuration
+    - name: Install firewalld
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
+    - name: Enable firewalld
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: true
+        state: started
+
+    - name: Open HTTP port
+      ansible.posix.firewalld:
+        port: 80/tcp
+        permanent: true
+        state: enabled
+        immediate: true
+
+    - name: Open HTTPS port
+      ansible.posix.firewalld:
+        port: 443/tcp
+        permanent: true
+        state: enabled
+        immediate: true
+
+    # SELinux configuration
+    - name: Install SELinux policy tools
+      ansible.builtin.dnf:
+        name:
+          - policycoreutils-python-utils
+          - setools-console
+        state: present
+
+    - name: Set SELinux context for web root
+      community.general.sefcontext:
+        target: "{{ web_root }}(/.*)?"
+        setype: httpd_sys_rw_content_t
+        state: present
+
+    - name: Apply SELinux context
+      ansible.builtin.command: "restorecon -Rv {{ web_root }}"
+      changed_when: true
+
+    - name: Allow httpd to connect to network
+      ansible.posix.seboolean:
+        name: httpd_can_network_connect
+        state: true
+        persistent: true
+
+    - name: Allow httpd to connect to database
+      ansible.posix.seboolean:
+        name: httpd_can_network_connect_db
+        state: true
+        persistent: true
+
+  handlers:
+    - name: restart php-fpm
+      ansible.builtin.systemd:
+        name: php-fpm
+        state: restarted
+
+    - name: restart nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted

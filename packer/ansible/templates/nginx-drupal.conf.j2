@@ -1,0 +1,167 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root {{ web_root }}/web;
+    index index.php index.html;
+
+    # Health check endpoint (for Azure health probes)
+    location = /health {
+        access_log off;
+        return 200 "OK";
+        add_header Content-Type text/plain;
+    }
+
+    # Azure Front Door health probe
+    location = /health.html {
+        access_log off;
+        return 200 "OK";
+        add_header Content-Type text/html;
+    }
+
+    # Logging
+    access_log /var/log/nginx/drupal-access.log;
+    error_log /var/log/nginx/drupal-error.log;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+
+    # Client body size (for file uploads)
+    client_max_body_size 64M;
+
+    # Deny access to sensitive files
+    location ~ /\.ht {
+        deny all;
+    }
+
+    location ~ /\.git {
+        deny all;
+    }
+
+    location ~ ^/sites/.*/private/ {
+        deny all;
+    }
+
+    # Block access to backup and config files
+    location ~* \.(txt|log|sql|bak|config)$ {
+        deny all;
+    }
+
+    # Drupal-specific locations
+    location = /favicon.ico {
+        log_not_found off;
+        access_log off;
+    }
+
+    location = /robots.txt {
+        allow all;
+        log_not_found off;
+        access_log off;
+    }
+
+    # Block access to PHP files in specific directories
+    location ~ \..*/.*\.php$ {
+        return 403;
+    }
+
+    # Block access to scripts in vendor directory
+    location ~ ^/vendor/.*\.php$ {
+        deny all;
+        return 404;
+    }
+
+    # Drupal clean URLs
+    location / {
+        try_files $uri /index.php?$query_string;
+    }
+
+    # Static files caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        log_not_found off;
+        access_log off;
+    }
+
+    # PHP-FPM configuration
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+
+        # Security check
+        if (!-f $document_root$fastcgi_script_name) {
+            return 404;
+        }
+
+        # Mitigate path info attacks
+        include fastcgi_params;
+
+        # PHP-FPM socket
+        fastcgi_pass unix:/run/php-fpm/drupal.sock;
+        fastcgi_index index.php;
+
+        # FastCGI parameters
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param QUERY_STRING $query_string;
+
+        # Timeouts
+        fastcgi_read_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_connect_timeout 60;
+
+        # Buffers
+        fastcgi_buffer_size 128k;
+        fastcgi_buffers 256 16k;
+        fastcgi_busy_buffers_size 256k;
+        fastcgi_temp_file_write_size 256k;
+    }
+
+    # Drupal update.php
+    location = /update.php {
+        fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+        fastcgi_pass unix:/run/php-fpm/drupal.sock;
+        fastcgi_index update.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_read_timeout 600;
+    }
+
+    # Private files (served through Drupal)
+    location ~ ^(/[a-z\-]+)?/system/files/ {
+        try_files $uri /index.php?$query_string;
+    }
+
+    # Aggregated CSS/JS (with query strings)
+    location ~ ^/sites/.*/files/css/ {
+        try_files $uri @rewrite;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location ~ ^/sites/.*/files/js/ {
+        try_files $uri @rewrite;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Image styles
+    location ~ ^/sites/.*/files/styles/ {
+        try_files $uri @rewrite;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location @rewrite {
+        rewrite ^/(.*)$ /index.php?q=$1;
+    }
+}

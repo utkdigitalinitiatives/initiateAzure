@@ -1,0 +1,25 @@
+# Copy this file to variables.auto.pkrvars.hcl and fill in values
+
+# Azure subscription
+subscription_id = "your-subscription-id"
+
+# Gallery configuration
+gallery_resource_group_name = "drupal-images-rg"
+gallery_name                = "drupal_gallery"
+image_name                  = "drupal-rocky-linux-9"
+image_version               = "1.0.0"
+
+# Build configuration
+location = "eastus"
+vm_size  = "Standard_D2s_v5"
+
+# Replication regions (add more as needed)
+replication_regions = ["eastus"]
+
+# PHP version
+php_version = "8.3"
+
+# Optional: Build VM networking
+# build_vnet_name                = "build-vnet"
+# build_subnet_name              = "build-subnet"
+# build_vnet_resource_group_name = "network-rg"

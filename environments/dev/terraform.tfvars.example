@@ -1,0 +1,29 @@
+# Example terraform.tfvars for dev environment
+# Copy this file to terraform.tfvars and update with your values
+
+location = "eastus"
+
+# Set this when deploying an ephemeral PR environment
+# pr_number = "123"
+
+# Subnet ID where the VM will be deployed
+# This should be a subnet in your shared VNet that can reach PostgreSQL and Blob Storage
+subnet_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_NETWORK_RG/providers/Microsoft.Network/virtualNetworks/YOUR_VNET/subnets/dev-subnet"
+
+vm_size = "Standard_D2s_v5"
+
+admin_username = "drupaladmin"
+
+# Your SSH public key for accessing the VM
+admin_ssh_public_key = "ssh-rsa AAAAB3... your-key-here"
+
+# Set to true to assign a public IP for direct SSH access during testing
+assign_public_ip = true
+
+# Optional: cloud-init script for initial setup
+# custom_data = <<-EOF
+#   #!/bin/bash
+#   dnf update -y
+#   dnf install -y epel-release
+#   dnf install -y nginx php php-fpm php-mysqlnd php-gd php-xml php-mbstring
+# EOF
