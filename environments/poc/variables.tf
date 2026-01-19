@@ -144,3 +144,10 @@ variable "db_allowed_ips" {
   type        = list(string)
   default     = []
 }
+
+# Blob Storage configuration
+variable "enable_vmss_blob_access" {
+  description = "Enable VMSS blob access role assignment. Set false for initial deployment, true after VMSS exists."
+  type        = bool
+  default     = false
+}

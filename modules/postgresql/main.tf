@@ -52,6 +52,11 @@ resource "azurerm_postgresql_flexible_server" "main" {
   zone = var.availability_zone
 
   tags = local.common_tags
+
+  # Zone is auto-assigned by Azure if not specified and cannot be changed after creation
+  lifecycle {
+    ignore_changes = [zone]
+  }
 }
 
 # Firewall rule: Allow Azure services (only when public access enabled)

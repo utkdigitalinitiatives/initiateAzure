@@ -97,6 +97,12 @@ variable "allowed_subnet_ids" {
 }
 
 # Managed identity access
+variable "enable_vmss_blob_access" {
+  description = "Enable blob access for VMSS managed identity (must be known at plan time)"
+  type        = bool
+  default     = false
+}
+
 variable "vmss_principal_id" {
   description = "Principal ID of the VMSS managed identity to grant blob access"
   type        = string

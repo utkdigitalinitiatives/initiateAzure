@@ -119,8 +119,9 @@ module "blob_storage" {
   soft_delete_retention_days = 7
   enable_versioning     = false  # Not needed for PoC
 
-  # Grant VMSS managed identity access after VMSS is created
-  vmss_principal_id = module.vmss.vmss_identity_principal_id
+  # Two-pass deployment: set false initially, true after VMSS exists
+  enable_vmss_blob_access = var.enable_vmss_blob_access
+  vmss_principal_id       = var.enable_vmss_blob_access ? module.vmss.vmss_identity_principal_id : null
 
   tags = local.common_tags
 }

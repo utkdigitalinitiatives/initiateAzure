@@ -83,7 +83,7 @@ resource "azurerm_storage_container" "media" {
 
 # Role assignment: Allow VMSS managed identity to access blobs
 resource "azurerm_role_assignment" "vmss_blob_contributor" {
-  count                = var.vmss_principal_id != null ? 1 : 0
+  count                = var.enable_vmss_blob_access ? 1 : 0
   scope                = azurerm_storage_account.drupal.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = var.vmss_principal_id

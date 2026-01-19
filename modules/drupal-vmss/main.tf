@@ -35,7 +35,29 @@ resource "azurerm_linux_virtual_machine_scale_set" "drupal" {
   }
 
   # Custom image from Azure Compute Gallery (built with Packer)
+  # If source_image_id is provided, use it; otherwise fall back to marketplace
   source_image_id = var.source_image_id
+
+  # Fallback to Rocky Linux 9 marketplace image if no gallery image provided
+  dynamic "source_image_reference" {
+    for_each = var.source_image_id == null ? [1] : []
+    content {
+      publisher = "resf"
+      offer     = "rockylinux-x86_64"
+      sku       = "9-base"
+      version   = "latest"
+    }
+  }
+
+  # Plan block required for marketplace images
+  dynamic "plan" {
+    for_each = var.source_image_id == null ? [1] : []
+    content {
+      name      = "9-base"
+      publisher = "resf"
+      product   = "rockylinux-x86_64"
+    }
+  }
 
   os_disk {
     storage_account_type = var.os_disk_type
