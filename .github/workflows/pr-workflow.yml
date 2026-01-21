@@ -35,7 +35,6 @@ jobs:
           filters: |
             packer:
               - 'packer/**'
-              - 'ansible/**'
 
       - name: Generate version
         id: version
@@ -54,11 +53,14 @@ jobs:
           packer init .
           packer build \
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
+            -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
             -var "gallery_name=${{ vars.GALLERY_NAME }}" \
             -var "image_name=drupal-rocky-linux-9" \
-            drupal-rocky9.pkr.hcl
+            -var "location=${{ vars.LOCATION }}" \
+            -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
+            .
 
   # Stage 2: Deploy Dev Environment
   deploy-dev:

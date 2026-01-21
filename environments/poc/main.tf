@@ -12,14 +12,10 @@ terraform {
     }
   }
 
-  # Backend configuration for Terraform state
-  # Uncomment and configure for your Azure Storage backend
-  # backend "azurerm" {
-  #   resource_group_name  = "terraform-state-rg"
-  #   storage_account_name = "tfstateaccount"
-  #   container_name       = "tfstate"
-  #   key                  = "poc/terraform.tfstate"
-  # }
+  # Remote backend for CI/CD - values provided via -backend-config
+  # For local development, run: terraform init -backend=false
+  # For CI/CD, run: terraform init -backend-config="resource_group_name=..." -backend-config="storage_account_name=..." ...
+  backend "azurerm" {}
 }
 
 provider "azurerm" {

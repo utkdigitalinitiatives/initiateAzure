@@ -16,6 +16,8 @@ terraform.rc
 !*.tfvars.example
 .terraform.tfstate.lock.info
 tfplan
+backend.hcl
+!backend.hcl.example
 
 # Packer
 packer_cache/

@@ -60,6 +60,11 @@ output "vmss_id" {
   value       = module.vmss.vmss_id
 }
 
+output "vmss_name" {
+  description = "Name of the VMSS"
+  value       = module.vmss.vmss_name
+}
+
 output "vmss_identity_principal_id" {
   description = "Principal ID of the VMSS managed identity"
   value       = module.vmss.vmss_identity_principal_id
