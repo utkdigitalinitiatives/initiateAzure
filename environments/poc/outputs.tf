@@ -65,6 +65,13 @@ output "vmss_identity_principal_id" {
   value       = module.vmss.vmss_identity_principal_id
 }
 
+# Drupal Admin Credentials
+output "drupal_admin_password" {
+  description = "Password for the Drupal admin user"
+  value       = var.drupal_admin_password != null ? var.drupal_admin_password : random_password.drupal_admin.result
+  sensitive   = true
+}
+
 # Quick Start
 output "quick_start" {
   description = "Quick start information for the PoC"
@@ -76,6 +83,10 @@ output "quick_start" {
 
     Application URL: ${module.load_balancer.public_ip_fqdn != null ? "http://${module.load_balancer.public_ip_fqdn}" : "http://${module.load_balancer.public_ip_address}"}
 
+    Drupal Admin:
+      Username: admin
+      Password: (run 'terraform output -raw drupal_admin_password')
+
     PostgreSQL Server: ${module.postgresql.fqdn}
     Database Name: ${module.postgresql.database_name}
 
@@ -84,6 +95,9 @@ output "quick_start" {
 
     To SSH to VMSS instances (via Azure Bastion or jumpbox):
       ssh ${var.admin_username}@<instance-ip>
+
+    To check cloud-init status:
+      ssh ${var.admin_username}@<ip> 'sudo cat /var/log/drupal-init.log'
 
     ══════════════════════════════════════════════════════════════
   EOT

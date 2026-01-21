@@ -4,8 +4,15 @@ variable "environment" {
 }
 
 variable "source_image_id" {
-  description = "ID of the custom image from Azure Compute Gallery (built with Packer)"
+  description = "ID of the custom image from Azure Compute Gallery (built with Packer). Set to null to use marketplace image."
   type        = string
+  default     = null
+}
+
+variable "use_marketplace_plan" {
+  description = "Include Rocky Linux marketplace plan info. Required for gallery images built from marketplace images."
+  type        = bool
+  default     = true
 }
 
 variable "resource_group_name" {

@@ -49,9 +49,9 @@ resource "azurerm_linux_virtual_machine_scale_set" "drupal" {
     }
   }
 
-  # Plan block required for marketplace images
+  # Plan block required for marketplace images AND gallery images built from marketplace
   dynamic "plan" {
-    for_each = var.source_image_id == null ? [1] : []
+    for_each = var.use_marketplace_plan ? [1] : []
     content {
       name      = "9-base"
       publisher = "resf"

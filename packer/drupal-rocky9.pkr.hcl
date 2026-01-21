@@ -75,7 +75,7 @@ build {
   name    = "drupal-rocky9"
   sources = ["source.azure-arm.drupal"]
 
-  # Provisioner: Ansible
+  # Provisioner: Ansible (using piped transfer to avoid SFTP dependency)
   provisioner "ansible" {
     playbook_file = "${path.root}/ansible/playbook.yml"
     user          = "packer"
@@ -88,7 +88,8 @@ build {
 
     ansible_env_vars = [
       "ANSIBLE_HOST_KEY_CHECKING=False",
-      "ANSIBLE_SSH_ARGS=-o ControlMaster=auto -o ControlPersist=60s"
+      "ANSIBLE_SSH_ARGS=-o ControlMaster=auto -o ControlPersist=60s",
+      "ANSIBLE_SSH_TRANSFER_METHOD=piped"
     ]
   }
 

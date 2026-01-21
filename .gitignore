@@ -19,6 +19,8 @@ terraform.rc
 # Packer
 packer_cache/
 output-*/
+*.auto.pkrvars.hcl
+!*.pkrvars.hcl.example
 
 # IDE and editors
 .idea/

@@ -151,3 +151,11 @@ variable "enable_vmss_blob_access" {
   type        = bool
   default     = false
 }
+
+# Drupal configuration
+variable "drupal_admin_password" {
+  description = "Password for the Drupal admin user"
+  type        = string
+  sensitive   = true
+  default     = null  # If not provided, a random password will be generated
+}

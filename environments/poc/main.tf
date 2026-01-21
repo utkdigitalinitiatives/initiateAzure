@@ -37,6 +37,18 @@ locals {
   }
 }
 
+# Generate random hash salt for Drupal security
+resource "random_password" "drupal_hash_salt" {
+  length  = 64
+  special = false
+}
+
+# Generate random Drupal admin password if not provided
+resource "random_password" "drupal_admin" {
+  length  = 24
+  special = true
+}
+
 # Resource group for all PoC resources
 resource "azurerm_resource_group" "poc" {
   name     = "drupal-poc-rg"
@@ -155,16 +167,20 @@ module "vmss" {
   # Connect to Load Balancer
   load_balancer_backend_pool_id = module.load_balancer.backend_pool_id
 
-  # Cloud-init with database and storage configuration
-  custom_data = base64encode(templatefile("${path.module}/cloud-init.tftpl", {
-    db_host           = module.postgresql.fqdn
-    db_name           = module.postgresql.database_name
-    db_user           = var.db_admin_username
-    db_password       = var.db_admin_password
-    storage_account   = module.blob_storage.storage_account_name
-    storage_container = module.blob_storage.container_name
-    storage_endpoint  = module.blob_storage.primary_blob_endpoint
-  }))
+  # Cloud-init with database, storage, and Drupal configuration
+  custom_data = templatefile("${path.module}/cloud-init.tftpl", {
+    db_host                = module.postgresql.fqdn
+    db_name                = module.postgresql.database_name
+    db_user                = var.db_admin_username
+    db_password            = var.db_admin_password
+    storage_account        = module.blob_storage.storage_account_name
+    storage_container      = module.blob_storage.container_name
+    storage_endpoint       = module.blob_storage.primary_blob_endpoint
+    storage_key            = module.blob_storage.primary_access_key
+    hash_salt              = random_password.drupal_hash_salt.result
+    lb_fqdn                = module.load_balancer.public_ip_fqdn
+    drupal_admin_password  = var.drupal_admin_password != null ? var.drupal_admin_password : random_password.drupal_admin.result
+  })
 
   tags = merge(local.common_tags, {
     ImageVersion = var.use_gallery_image ? var.image_version : "marketplace"

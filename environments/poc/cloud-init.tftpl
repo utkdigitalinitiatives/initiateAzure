@@ -1,43 +1,152 @@
 #cloud-config
 # Cloud-init configuration for Drupal PoC VMSS instances
+# This configures database, storage, and runs Drupal site installation
 
 write_files:
-  # Drupal database configuration
-  - path: /etc/drupal/database.conf
+  # Drupal environment configuration (PHP)
+  - path: /etc/drupal/environment.php
     permissions: '0640'
+    owner: root:drupal
     content: |
-      DB_HOST=${db_host}
-      DB_NAME=${db_name}
-      DB_USER=${db_user}
-      DB_PASSWORD=${db_password}
+      <?php
+      /**
+       * Drupal environment configuration.
+       * Populated by cloud-init at boot time.
+       */
 
-  # Azure Blob Storage configuration for Drupal media
-  - path: /etc/drupal/storage.conf
+      // Database configuration
+      $databases['default']['default'] = [
+        'database' => '${db_name}',
+        'username' => '${db_user}',
+        'password' => '${db_password}',
+        'host' => '${db_host}',
+        'port' => '5432',
+        'driver' => 'pgsql',
+        'prefix' => '',
+      ];
+
+      // Hash salt for security
+      $settings['hash_salt'] = '${hash_salt}';
+
+      // Trusted host patterns
+      $settings['trusted_host_patterns'] = [
+        '^localhost$',
+        '^127\.0\.0\.1$',
+        '^' . preg_quote('${lb_fqdn}', '/') . '$',
+      ];
+
+      // S3FS configuration for Azure Blob Storage via S3Proxy
+      $config['s3fs.settings']['bucket'] = '${storage_container}';
+      $config['s3fs.settings']['region'] = 'us-east-1';
+      $config['s3fs.settings']['use_customhost'] = TRUE;
+      $config['s3fs.settings']['hostname'] = 'localhost:8080';
+      $config['s3fs.settings']['use_path_style_endpoint'] = TRUE;
+      $config['s3fs.settings']['use_https'] = FALSE;
+
+      // S3FS credentials (not used with S3Proxy authorization=none)
+      $settings['s3fs.access_key'] = 'unused';
+      $settings['s3fs.secret_key'] = 'unused';
+
+      // Reverse proxy settings for Azure Load Balancer
+      $settings['reverse_proxy'] = TRUE;
+      $settings['reverse_proxy_addresses'] = ['127.0.0.1', '168.63.129.16'];
+      $settings['reverse_proxy_trusted_headers'] =
+        \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_FOR |
+        \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_HOST |
+        \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PORT |
+        \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PROTO;
+
+  # S3Proxy properties file
+  - path: /etc/s3proxy/s3proxy.properties
     permissions: '0640'
+    owner: root:s3proxy
     content: |
-      AZURE_STORAGE_ACCOUNT=${storage_account}
-      AZURE_STORAGE_CONTAINER=${storage_container}
-      AZURE_BLOB_ENDPOINT=${storage_endpoint}
+      # S3Proxy configuration for Azure Blob Storage
+      jclouds.provider=azureblob
+      jclouds.identity=${storage_account}
+      jclouds.credential=${storage_key}
+      jclouds.endpoint=https://${storage_account}.blob.core.windows.net
+      s3proxy.authorization=none
+      s3proxy.endpoint=http://127.0.0.1:8080
 
-  # Health check endpoint script
-  - path: /var/www/html/health
-    permissions: '0644'
+  # Drupal installation script
+  - path: /opt/drupal-init.sh
+    permissions: '0750'
+    owner: root:root
     content: |
-      OK
+      #!/bin/bash
+      set -e
+
+      DRUPAL_ROOT="/var/www/drupal"
+      DRUSH="$DRUPAL_ROOT/vendor/bin/drush"
+      LOG_FILE="/var/log/drupal-init.log"
+      LOCK_FILE="/var/run/drupal-init.lock"
+
+      # Prevent concurrent runs
+      exec 200>"$LOCK_FILE"
+      flock -n 200 || { echo "Another instance is running"; exit 0; }
+
+      log() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+      }
+
+      log "Starting Drupal initialization..."
+
+      # Wait for S3Proxy to be ready
+      for i in {1..30}; do
+        if curl -s http://127.0.0.1:8080/ > /dev/null 2>&1; then
+          log "S3Proxy is ready"
+          break
+        fi
+        log "Waiting for S3Proxy... ($i/30)"
+        sleep 2
+      done
+
+      # Check if Drupal is already installed
+      cd "$DRUPAL_ROOT"
+      if sudo -u drupal $DRUSH status --field=bootstrap 2>/dev/null | grep -q "Successful"; then
+        log "Drupal already installed, running updates..."
+        sudo -u drupal $DRUSH updatedb -y 2>&1 | tee -a "$LOG_FILE" || true
+        sudo -u drupal $DRUSH cache:rebuild 2>&1 | tee -a "$LOG_FILE" || true
+        log "Updates complete"
+      else
+        log "Installing Drupal..."
+        sudo -u drupal $DRUSH site:install standard \
+          --db-url="pgsql://${db_user}:${db_password}@${db_host}:5432/${db_name}" \
+          --site-name="Drupal PoC" \
+          --account-name=admin \
+          --account-pass="${drupal_admin_password}" \
+          --account-mail="admin@example.com" \
+          -y 2>&1 | tee -a "$LOG_FILE"
+
+        log "Enabling S3FS module..."
+        sudo -u drupal $DRUSH en s3fs -y 2>&1 | tee -a "$LOG_FILE" || true
+
+        log "Rebuilding cache..."
+        sudo -u drupal $DRUSH cache:rebuild 2>&1 | tee -a "$LOG_FILE"
+
+        log "Drupal installation complete"
+      fi
+
+      log "Drupal initialization finished"
 
 runcmd:
-  # Ensure config directory exists
-  - mkdir -p /etc/drupal
-  - chown root:nginx /etc/drupal
+  # Ensure directories have correct ownership
+  - chown root:drupal /etc/drupal
   - chmod 750 /etc/drupal
+  - chown root:drupal /etc/drupal/environment.php
 
-  # Set proper permissions on config files
-  - chown root:nginx /etc/drupal/*.conf 2>/dev/null || true
+  - chown root:s3proxy /etc/s3proxy
+  - chmod 750 /etc/s3proxy
+  - chown root:s3proxy /etc/s3proxy/s3proxy.properties
 
-  # Ensure health endpoint is accessible
-  - mkdir -p /var/www/html
-  - chown nginx:nginx /var/www/html/health 2>/dev/null || true
+  # Start S3Proxy service
+  - systemctl start s3proxy
+  - systemctl status s3proxy || true
 
-  # Restart services to pick up configuration
-  - systemctl restart php-fpm 2>/dev/null || true
-  - systemctl restart nginx 2>/dev/null || true
+  # Run Drupal initialization
+  - /opt/drupal-init.sh
+
+  # Restart web services
+  - systemctl restart php-fpm
+  - systemctl restart httpd
