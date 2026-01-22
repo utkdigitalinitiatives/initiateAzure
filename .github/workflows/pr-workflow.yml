@@ -83,7 +83,12 @@ jobs:
 
       - name: Terraform Init
         working-directory: environments/dev
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=dev/pr-${{ github.event.pull_request.number }}/terraform.tfstate"
 
       - name: Terraform Apply
         working-directory: environments/dev
@@ -164,7 +169,11 @@ jobs:
       - name: Destroy Dev VM
         working-directory: environments/dev
         run: |
-          terraform init
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=dev/pr-${{ github.event.pull_request.number }}/terraform.tfstate"
           terraform destroy -auto-approve -target=module.dev_vm \
             -var="pr_number=${{ github.event.pull_request.number }}" \
             -var="image_version=${{ needs.build-image.outputs.image_version }}"
@@ -172,7 +181,12 @@ jobs:
       # Deploy Test VM (uses same PostgreSQL)
       - name: Terraform Init (Test)
         working-directory: environments/test
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=test/pr-${{ github.event.pull_request.number }}/terraform.tfstate"
 
       - name: Deploy Test VM
         working-directory: environments/test

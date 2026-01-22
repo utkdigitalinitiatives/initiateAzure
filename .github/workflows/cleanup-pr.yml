@@ -39,7 +39,11 @@ jobs:
         working-directory: environments/test
         continue-on-error: true
         run: |
-          terraform init
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=test/pr-${{ github.event.pull_request.number }}/terraform.tfstate"
           terraform destroy -auto-approve \
             -var="pr_number=${{ github.event.pull_request.number }}" || true
 
@@ -47,7 +51,11 @@ jobs:
       - name: Destroy Dev Environment
         working-directory: environments/dev
         run: |
-          terraform init
+          terraform init \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=dev/pr-${{ github.event.pull_request.number }}/terraform.tfstate"
           terraform destroy -auto-approve \
             -var="pr_number=${{ github.event.pull_request.number }}"
 

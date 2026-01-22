@@ -9,13 +9,9 @@ terraform {
   }
 
   # Backend configuration for Terraform state
-  # Uncomment and configure for your Azure Storage backend
-  # backend "azurerm" {
-  #   resource_group_name  = "terraform-state-rg"
-  #   storage_account_name = "tfstateaccount"
-  #   container_name       = "tfstate"
-  #   key                  = "dev/terraform.tfstate"
-  # }
+  # Uses partial configuration - remaining values passed via -backend-config
+  # State key includes PR number for isolation: dev/pr-{number}/terraform.tfstate
+  backend "azurerm" {}
 }
 
 provider "azurerm" {
