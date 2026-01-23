@@ -14,6 +14,7 @@ env:
   TF_VAR_gallery_name: ${{ vars.GALLERY_NAME }}
   TF_VAR_gallery_resource_group_name: ${{ vars.GALLERY_RESOURCE_GROUP }}
   TF_VAR_subnet_id: ${{ vars.SUBNET_ID }}
+  TF_VAR_location: ${{ vars.LOCATION }}
 
 jobs:
   cleanup:
@@ -29,10 +30,10 @@ jobs:
         with:
           terraform_wrapper: false
 
-      # Use a placeholder image version for destroy (required by variables but not used)
+      # Use 'latest' as image version for destroy (required by data source validation)
       - name: Set placeholder variables
         run: |
-          echo "TF_VAR_image_version=cleanup-placeholder" >> $GITHUB_ENV
+          echo "TF_VAR_image_version=latest" >> $GITHUB_ENV
 
       # Destroy Test VM first (if exists)
       - name: Destroy Test Environment
