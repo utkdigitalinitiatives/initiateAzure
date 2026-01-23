@@ -88,3 +88,9 @@ variable "enable_boot_diagnostics" {
   type        = bool
   default     = true
 }
+
+variable "use_marketplace_plan" {
+  description = "Include marketplace plan information (required for gallery images built from marketplace)"
+  type        = bool
+  default     = true
+}

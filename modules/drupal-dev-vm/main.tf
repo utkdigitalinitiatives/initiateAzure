@@ -90,9 +90,9 @@ resource "azurerm_linux_virtual_machine" "dev" {
     }
   }
 
-  # Marketplace plan (only required when using marketplace image)
+  # Marketplace plan (required for marketplace image or gallery images built from marketplace)
   dynamic "plan" {
-    for_each = var.source_image_id == null ? [1] : []
+    for_each = var.source_image_id == null || var.use_marketplace_plan ? [1] : []
     content {
       name      = "9-base"
       product   = "rockylinux-x86_64"
