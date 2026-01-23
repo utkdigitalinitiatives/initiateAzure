@@ -38,7 +38,16 @@ jobs:
 
       - name: Generate version
         id: version
-        run: echo "version=pr-${{ github.event.pull_request.number }}-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+        env:
+          FALLBACK_VERSION: "1.4.0"
+        run: |
+          if [ "${{ steps.changes.outputs.packer }}" == "true" ]; then
+            echo "version=pr-${{ github.event.pull_request.number }}-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+            echo "Building new image for this PR"
+          else
+            echo "version=$FALLBACK_VERSION" >> $GITHUB_OUTPUT
+            echo "No packer changes - using fallback image version $FALLBACK_VERSION"
+          fi
 
       - name: Setup Packer
         if: steps.changes.outputs.packer == 'true'
