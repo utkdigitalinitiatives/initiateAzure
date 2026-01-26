@@ -1,3 +1,4 @@
+# Image Build Test - v1
 packer {
   required_plugins {
     azure = {
