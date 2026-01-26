@@ -1,3 +1,4 @@
+# Image Build Test - v1
 packer {
   required_plugins {
     azure = {
@@ -13,8 +14,12 @@ packer {
 
 # Source: Azure ARM builder
 source "azure-arm" "drupal" {
-  # Authentication - uses environment variables or managed identity
+  # Authentication
   use_azure_cli_auth = var.use_azure_cli_auth
+  subscription_id    = var.subscription_id
+  client_id          = var.client_id
+  client_secret      = var.client_secret
+  tenant_id          = var.tenant_id
 
   # Build VM configuration
   location = var.location
