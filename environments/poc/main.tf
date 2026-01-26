@@ -73,6 +73,7 @@ module "networking" {
   private_endpoints_subnet_address_prefix  = var.private_endpoints_prefix
   enable_load_balancer_rules               = true   # PoC uses LB instead of Front Door
   enable_front_door_rules                  = false  # Disable Front Door rules for PoC
+  allowed_ssh_cidr_blocks                  = var.allowed_ssh_cidr_blocks
 
   tags = local.common_tags
 }

@@ -29,3 +29,7 @@ db_allowed_ips = ["YOUR.PUBLIC.IP.HERE"]
 # vnet_address_space       = ["10.0.0.0/16"]
 # web_subnet_prefix        = "10.0.1.0/24"
 # private_endpoints_prefix = "10.0.2.0/24"
+
+# SSH Access - set to allow SSH for troubleshooting (use specific IPs in production)
+# allowed_ssh_cidr_blocks = ["0.0.0.0/0"]  # Allow from anywhere (dev/test only)
+# allowed_ssh_cidr_blocks = ["YOUR.PUBLIC.IP/32"]  # Restrict to your IP

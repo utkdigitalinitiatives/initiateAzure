@@ -59,6 +59,12 @@ variable "private_endpoints_prefix" {
   default     = "10.0.2.0/24"
 }
 
+variable "allowed_ssh_cidr_blocks" {
+  description = "CIDR blocks allowed for SSH access (e.g., ['0.0.0.0/0'] to allow all)"
+  type        = list(string)
+  default     = []
+}
+
 # Load Balancer
 variable "lb_dns_label" {
   description = "DNS label for Load Balancer public IP (creates <label>.<region>.cloudapp.azure.com)"
