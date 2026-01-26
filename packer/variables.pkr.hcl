@@ -10,6 +10,25 @@ variable "subscription_id" {
   type        = string
 }
 
+variable "client_id" {
+  description = "Azure service principal client ID (required when use_azure_cli_auth=false)"
+  type        = string
+  default     = ""
+}
+
+variable "client_secret" {
+  description = "Azure service principal client secret (required when use_azure_cli_auth=false)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "tenant_id" {
+  description = "Azure tenant ID (required when use_azure_cli_auth=false)"
+  type        = string
+  default     = ""
+}
+
 # Gallery configuration
 variable "gallery_resource_group_name" {
   description = "Resource group containing the Shared Image Gallery"

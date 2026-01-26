@@ -65,6 +65,9 @@ jobs:
           packer init .
           packer build \
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
+            -var "client_id=$ARM_CLIENT_ID" \
+            -var "client_secret=$ARM_CLIENT_SECRET" \
+            -var "tenant_id=$ARM_TENANT_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
