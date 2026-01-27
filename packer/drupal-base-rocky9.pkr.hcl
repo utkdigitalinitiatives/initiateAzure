@@ -1,10 +1,10 @@
-# Drupal App Image - Rocky Linux 9
-# This image builds on top of the base image and adds Drupal-specific components.
-# The base image (drupal-base-rocky9.pkr.hcl) provides system dependencies.
+# Base Image for Drupal - Rocky Linux 9
+# This image contains all system-level dependencies and is rebuilt monthly.
+# The app image (drupal-rocky9.pkr.hcl) builds on top of this for Drupal-specific tasks.
 # Plugin requirements are in plugins.pkr.hcl
 
-# Source: Azure ARM builder using base image from gallery
-source "azure-arm" "drupal" {
+# Source: Azure ARM builder
+source "azure-arm" "drupal-base" {
   # Authentication
   use_azure_cli_auth = var.use_azure_cli_auth
   subscription_id    = var.subscription_id
@@ -16,14 +16,16 @@ source "azure-arm" "drupal" {
   location = var.location
   vm_size  = var.vm_size
 
-  # Source image: Base image from Shared Image Gallery
-  # This replaces the marketplace image for faster builds
-  shared_image_gallery {
-    subscription   = var.subscription_id
-    resource_group = var.gallery_resource_group_name
-    gallery_name   = var.gallery_name
-    image_name     = var.base_image_name
-    image_version  = var.base_image_version
+  # Base image: Rocky Linux 9 from marketplace
+  image_publisher = "resf"
+  image_offer     = "rockylinux-x86_64"
+  image_sku       = "9-base"
+
+  # Required for Rocky Linux marketplace image
+  plan_info {
+    plan_name      = "9-base"
+    plan_product   = "rockylinux-x86_64"
+    plan_publisher = "resf"
   }
 
   # Output to Shared Image Gallery
@@ -31,7 +33,7 @@ source "azure-arm" "drupal" {
     subscription         = var.subscription_id
     resource_group       = var.gallery_resource_group_name
     gallery_name         = var.gallery_name
-    image_name           = var.image_name
+    image_name           = var.base_image_name
     image_version        = var.image_version
     replication_regions  = var.replication_regions
     storage_account_type = "Standard_LRS"
@@ -39,7 +41,7 @@ source "azure-arm" "drupal" {
 
   # Managed image configuration (intermediate)
   managed_image_resource_group_name = var.gallery_resource_group_name
-  managed_image_name                = "drupal-rocky9-${var.image_version}"
+  managed_image_name                = "drupal-base-rocky9-${var.image_version}"
 
   # OS disk configuration
   os_type         = "Linux"
@@ -56,30 +58,28 @@ source "azure-arm" "drupal" {
 
   # Azure tags for the build VM and resulting image
   azure_tags = {
-    Application    = "drupal"
-    Builder        = "packer"
-    Version        = var.image_version
-    OS             = "rocky-linux-9"
-    ImageType      = "app"
-    BaseImageVer   = var.base_image_version
-    BuildDate      = timestamp()
+    Application = "drupal-base"
+    Builder     = "packer"
+    Version     = var.image_version
+    OS          = "rocky-linux-9"
+    ImageType   = "base"
+    BuildDate   = timestamp()
   }
 }
 
 # Build configuration
 build {
-  name    = "drupal-rocky9"
-  sources = ["source.azure-arm.drupal"]
+  name    = "drupal-base-rocky9"
+  sources = ["source.azure-arm.drupal-base"]
 
-  # Provisioner: Ansible (using piped transfer to avoid SFTP dependency)
+  # Provisioner: Ansible for base system configuration
   provisioner "ansible" {
-    playbook_file = "${path.root}/ansible/playbook.yml"
+    playbook_file = "${path.root}/ansible/playbook-base.yml"
     user          = "packer"
 
     extra_arguments = [
       "--extra-vars", "ansible_become=true",
-      "--extra-vars", "php_version=${var.php_version}",
-      "--extra-vars", "drupal_env=production"
+      "--extra-vars", "php_version=${var.php_version}"
     ]
 
     ansible_env_vars = [

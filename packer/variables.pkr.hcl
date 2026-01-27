@@ -51,6 +51,19 @@ variable "image_version" {
   type        = string
 }
 
+# Base image configuration (for two-tier image strategy)
+variable "base_image_name" {
+  description = "Name of the base image definition in the gallery"
+  type        = string
+  default     = "drupal-base-rocky-linux-9"
+}
+
+variable "base_image_version" {
+  description = "Version of the base image to use (e.g., 2024.01.0, latest)"
+  type        = string
+  default     = "latest"
+}
+
 variable "replication_regions" {
   description = "Regions to replicate the image to"
   type        = list(string)

@@ -35,7 +35,9 @@ jobs:
         with:
           filters: |
             packer:
-              - 'packer/**'
+              - 'packer/drupal-rocky9.pkr.hcl'
+              - 'packer/ansible/playbook.yml'
+              - 'packer/variables.pkr.hcl'
 
       - name: Generate version
         id: version
@@ -70,12 +72,13 @@ jobs:
             -var "tenant_id=$ARM_TENANT_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
+            -var "base_image_version=latest" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
             -var "gallery_name=${{ vars.GALLERY_NAME }}" \
             -var "image_name=drupal-rocky-linux-9" \
             -var "location=${{ vars.LOCATION }}" \
             -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
-            .
+            drupal-rocky9.pkr.hcl
 
   # Stage 2: Deploy Dev Environment
   deploy-dev:

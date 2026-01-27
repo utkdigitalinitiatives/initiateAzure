@@ -1,23 +1,23 @@
-name: Build Drupal Image
+name: Build Base Image
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'packer/drupal-rocky9.pkr.hcl'
-      - 'packer/ansible/playbook.yml'
-      - 'packer/variables.pkr.hcl'
+  # Monthly rebuild on the 1st at 00:00 UTC
+  schedule:
+    - cron: '0 0 1 * *'
+  # Manual trigger
   workflow_dispatch:
     inputs:
       image_version:
-        description: 'Image version (e.g., 1.0.0)'
+        description: 'Base image version (e.g., 1.0.0)'
         required: true
         type: string
-      base_image_version:
-        description: 'Base image version to use (default: latest)'
-        required: false
-        type: string
-        default: 'latest'
+  # Trigger on changes to base image files
+  push:
+    branches: [main]
+    paths:
+      - 'packer/drupal-base-rocky9.pkr.hcl'
+      - 'packer/ansible/playbook-base.yml'
+      - 'packer/ansible/templates/**'
 
 env:
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -26,8 +26,8 @@ env:
   ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
 
 jobs:
-  build-image:
-    name: Build Packer Image
+  build-base-image:
+    name: Build Base Packer Image
     runs-on: ubuntu-latest
     outputs:
       image_version: ${{ steps.version.outputs.version }}
@@ -47,21 +47,13 @@ jobs:
           if [ -n "${{ github.event.inputs.image_version }}" ]; then
             echo "version=${{ github.event.inputs.image_version }}" >> $GITHUB_OUTPUT
           else
-            echo "version=$(date +%Y.%m.%d)-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+            # For scheduled builds, use year.month format
+            echo "version=$(date +%Y.%m.0)" >> $GITHUB_OUTPUT
           fi
 
       - name: Packer Init
         working-directory: packer
-        run: packer init .
-
-      - name: Set base image version
-        id: base_version
-        run: |
-          if [ -n "${{ github.event.inputs.base_image_version }}" ]; then
-            echo "version=${{ github.event.inputs.base_image_version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=latest" >> $GITHUB_OUTPUT
-          fi
+        run: packer init drupal-base-rocky9.pkr.hcl
 
       - name: Packer Validate
         working-directory: packer
@@ -70,13 +62,12 @@ jobs:
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
-            -var "base_image_version=${{ steps.base_version.outputs.version }}" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
             -var "gallery_name=${{ vars.GALLERY_NAME }}" \
-            -var "image_name=drupal-rocky-linux-9" \
+            -var "base_image_name=drupal-base-rocky-linux-9" \
             -var "location=${{ vars.LOCATION }}" \
             -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
-            drupal-rocky9.pkr.hcl
+            drupal-base-rocky9.pkr.hcl
 
       - name: Packer Build
         working-directory: packer
@@ -85,18 +76,19 @@ jobs:
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
-            -var "base_image_version=${{ steps.base_version.outputs.version }}" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
             -var "gallery_name=${{ vars.GALLERY_NAME }}" \
-            -var "image_name=drupal-rocky-linux-9" \
+            -var "base_image_name=drupal-base-rocky-linux-9" \
             -var "location=${{ vars.LOCATION }}" \
             -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
-            drupal-rocky9.pkr.hcl
+            drupal-base-rocky9.pkr.hcl
 
       - name: Output image version
         run: |
-          echo "## Image Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## Base Image Build Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Base Image:** drupal-base-rocky-linux-9:${{ steps.base_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** drupal-base-rocky-linux-9" >> $GITHUB_STEP_SUMMARY
           echo "**Gallery:** ${{ vars.GALLERY_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This base image can now be used by the app image build workflow." >> $GITHUB_STEP_SUMMARY
