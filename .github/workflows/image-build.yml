@@ -67,7 +67,11 @@ jobs:
         working-directory: packer
         run: |
           packer validate \
+            -only='drupal-rocky9*' \
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
+            -var "client_id=$ARM_CLIENT_ID" \
+            -var "client_secret=$ARM_CLIENT_SECRET" \
+            -var "tenant_id=$ARM_TENANT_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
             -var "base_image_version=${{ steps.base_version.outputs.version }}" \
@@ -76,13 +80,17 @@ jobs:
             -var "image_name=drupal-rocky-linux-9" \
             -var "location=${{ vars.LOCATION }}" \
             -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
-            drupal-rocky9.pkr.hcl
+            .
 
       - name: Packer Build
         working-directory: packer
         run: |
           packer build \
+            -only='drupal-rocky9*' \
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
+            -var "client_id=$ARM_CLIENT_ID" \
+            -var "client_secret=$ARM_CLIENT_SECRET" \
+            -var "tenant_id=$ARM_TENANT_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
             -var "base_image_version=${{ steps.base_version.outputs.version }}" \
@@ -91,7 +99,7 @@ jobs:
             -var "image_name=drupal-rocky-linux-9" \
             -var "location=${{ vars.LOCATION }}" \
             -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
-            drupal-rocky9.pkr.hcl
+            .
 
       - name: Output image version
         run: |
