@@ -2,6 +2,8 @@
 # This image builds on top of the base image and adds Drupal-specific components.
 # The base image (drupal-base-rocky9.pkr.hcl) provides system dependencies.
 # Plugin requirements are in plugins.pkr.hcl
+#
+# Two-tier build strategy: Base image (~27 min monthly) + App image (~21 min per PR)
 
 # Source: Azure ARM builder using base image from gallery
 source "azure-arm" "drupal" {
