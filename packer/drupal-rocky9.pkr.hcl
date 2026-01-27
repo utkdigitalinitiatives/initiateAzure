@@ -28,6 +28,14 @@ source "azure-arm" "drupal" {
     image_version  = var.base_image_version
   }
 
+  # Required: Plan info from the original marketplace image (Rocky Linux)
+  # Azure requires this even when using a gallery image derived from marketplace
+  plan_info {
+    plan_name      = "9-base"
+    plan_product   = "rockylinux-x86_64"
+    plan_publisher = "resf"
+  }
+
   # Output to Shared Image Gallery
   shared_image_gallery_destination {
     subscription         = var.subscription_id

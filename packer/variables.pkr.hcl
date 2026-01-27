@@ -59,9 +59,9 @@ variable "base_image_name" {
 }
 
 variable "base_image_version" {
-  description = "Version of the base image to use (e.g., 2024.01.0, latest)"
+  description = "Version of the base image to use (e.g., 2025.01.0)"
   type        = string
-  default     = "latest"
+  default     = "2025.01.0"
 }
 
 variable "replication_regions" {
