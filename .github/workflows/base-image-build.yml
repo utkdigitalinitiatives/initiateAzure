@@ -53,35 +53,35 @@ jobs:
 
       - name: Packer Init
         working-directory: packer
-        run: packer init drupal-base-rocky9.pkr.hcl
+        run: packer init .
 
       - name: Packer Validate
         working-directory: packer
         run: |
           packer validate \
+            -only='drupal-base-rocky9*' \
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
             -var "gallery_name=${{ vars.GALLERY_NAME }}" \
-            -var "base_image_name=drupal-base-rocky-linux-9" \
             -var "location=${{ vars.LOCATION }}" \
             -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
-            drupal-base-rocky9.pkr.hcl
+            .
 
       - name: Packer Build
         working-directory: packer
         run: |
           packer build \
+            -only='drupal-base-rocky9*' \
             -var "subscription_id=$ARM_SUBSCRIPTION_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
             -var "gallery_name=${{ vars.GALLERY_NAME }}" \
-            -var "base_image_name=drupal-base-rocky-linux-9" \
             -var "location=${{ vars.LOCATION }}" \
             -var "replication_regions=[\"${{ vars.LOCATION }}\"]" \
-            drupal-base-rocky9.pkr.hcl
+            .
 
       - name: Output image version
         run: |
