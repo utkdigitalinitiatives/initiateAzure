@@ -85,3 +85,10 @@ resource "azurerm_postgresql_flexible_server_database" "drupal" {
   charset   = "UTF8"
   collation = "en_US.utf8"
 }
+
+# Enable pg_trgm extension (required by Drupal 11)
+resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
+  name      = "azure.extensions"
+  server_id = azurerm_postgresql_flexible_server.devtest.id
+  value     = "PG_TRGM"
+}
