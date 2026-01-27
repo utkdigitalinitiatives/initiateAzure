@@ -1,12 +1,8 @@
 name: Build Drupal Image
 
+# Manual trigger only - PR workflow builds images for dev/test/prod promotion
+# No auto-build on merge since PR-built images are promoted directly
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'packer/drupal-rocky9.pkr.hcl'
-      - 'packer/ansible/playbook.yml'
-      - 'packer/variables.pkr.hcl'
   workflow_dispatch:
     inputs:
       image_version:
