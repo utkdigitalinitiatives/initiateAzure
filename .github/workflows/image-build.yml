@@ -60,7 +60,8 @@ jobs:
           if [ -n "${{ github.event.inputs.base_image_version }}" ]; then
             echo "version=${{ github.event.inputs.base_image_version }}" >> $GITHUB_OUTPUT
           else
-            echo "version=latest" >> $GITHUB_OUTPUT
+            # Use repository variable if set, otherwise default to current base version
+            echo "version=${{ vars.BASE_IMAGE_VERSION || '2025.01.0' }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Packer Validate
