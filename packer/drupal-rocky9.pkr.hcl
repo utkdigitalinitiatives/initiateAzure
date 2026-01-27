@@ -2,6 +2,8 @@
 # This image builds on top of the base image and adds Drupal-specific components.
 # The base image (drupal-base-rocky9.pkr.hcl) provides system dependencies.
 # Plugin requirements are in plugins.pkr.hcl
+#
+# Two-tier build strategy: Base image (~27 min monthly) + App image (~21 min per PR)
 
 # Source: Azure ARM builder using base image from gallery
 source "azure-arm" "drupal" {
@@ -24,6 +26,14 @@ source "azure-arm" "drupal" {
     gallery_name   = var.gallery_name
     image_name     = var.base_image_name
     image_version  = var.base_image_version
+  }
+
+  # Required: Plan info from the original marketplace image (Rocky Linux)
+  # Azure requires this even when using a gallery image derived from marketplace
+  plan_info {
+    plan_name      = "9-base"
+    plan_product   = "rockylinux-x86_64"
+    plan_publisher = "resf"
   }
 
   # Output to Shared Image Gallery
