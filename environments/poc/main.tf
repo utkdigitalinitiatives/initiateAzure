@@ -1,3 +1,4 @@
+# PoC environment - serves as the de facto production environment for Drupal infrastructure
 terraform {
   required_version = ">= 1.0"
 
