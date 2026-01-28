@@ -60,6 +60,32 @@ jobs:
         with:
           version: latest
 
+      - name: Azure CLI Login
+        if: steps.changes.outputs.packer == 'true'
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Get base image version
+        if: steps.changes.outputs.packer == 'true'
+        id: base_version
+        run: |
+          # Query Azure SIG for the latest base image version
+          echo "Querying Azure Shared Image Gallery for latest base image..."
+          VERSION=$(az sig image-version list \
+            --gallery-name ${{ vars.GALLERY_NAME }} \
+            --gallery-image-definition drupal-base-rocky-linux-9 \
+            --resource-group ${{ vars.GALLERY_RESOURCE_GROUP }} \
+            --query "sort_by([].name, &@)[-1]" -o tsv)
+
+          if [ -z "$VERSION" ]; then
+            echo "::error::No base image found in gallery. Run base-image-build.yml first to create a base image."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using latest base image version from gallery: $VERSION"
+
       - name: Build image (if changed)
         if: steps.changes.outputs.packer == 'true'
         working-directory: packer
@@ -73,7 +99,7 @@ jobs:
             -var "tenant_id=$ARM_TENANT_ID" \
             -var "use_azure_cli_auth=false" \
             -var "image_version=${{ steps.version.outputs.version }}" \
-            -var "base_image_version=${{ vars.BASE_IMAGE_VERSION || '2025.01.0' }}" \
+            -var "base_image_version=${{ steps.base_version.outputs.version }}" \
             -var "gallery_resource_group_name=${{ vars.GALLERY_RESOURCE_GROUP }}" \
             -var "gallery_name=${{ vars.GALLERY_NAME }}" \
             -var "image_name=drupal-rocky-linux-9" \
