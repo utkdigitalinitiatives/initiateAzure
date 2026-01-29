@@ -40,9 +40,11 @@ resource "random_password" "drupal_hash_salt" {
 }
 
 # Generate random Drupal admin password if not provided
+# Use only shell-safe special characters to avoid escaping issues in cloud-init
 resource "random_password" "drupal_admin" {
-  length  = 24
-  special = true
+  length           = 24
+  special          = true
+  override_special = "!@#%^&*-_=+?"
 }
 
 # Resource group for all PoC resources
