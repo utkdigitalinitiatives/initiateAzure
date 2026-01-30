@@ -179,6 +179,7 @@ module "vmss" {
     hash_salt              = random_password.drupal_hash_salt.result
     lb_fqdn                = module.load_balancer.public_ip_fqdn
     drupal_admin_password  = var.drupal_admin_password != null ? var.drupal_admin_password : random_password.drupal_admin.result
+    drupal_site_uuid       = var.drupal_site_uuid
   })
 
   tags = merge(local.common_tags, {

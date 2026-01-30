@@ -165,3 +165,9 @@ variable "drupal_admin_password" {
   sensitive   = true
   default     = null  # If not provided, a random password will be generated
 }
+
+variable "drupal_site_uuid" {
+  description = "Fixed Drupal site UUID for config sync. Must match config/sync/system.site.yml"
+  type        = string
+  default     = "72edb80c-3cd5-4ec2-acb2-b9b9546ee9ea"  # PoC site UUID - DO NOT CHANGE
+}
